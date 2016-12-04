@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Transportation Flow Network</title>
+	<script src="http://d3js.org/d3.v4.min.js"></script>
+	<script src="http://d3js.org/topojson.v1.min.js"></script>
+	<style type="text/css">
+		.map {
+			fill: none;
+			stroke: black;
+		}
+
+		.trip {
+			fill: none;
+			stroke: red;
+		}
+	</style>
+</head>
+<body>
+<div id="visualization"></div>
+<script type="text/javascript">
+var svg_width = 1000;
+var svg_height = 600;
+// var margin = {top: 20, right: 80, bottom: 30, left: 50};
+// var width = svg_width - (margin.left + margin.right);
+// var height = svg_height - (margin.top + margin.bottom);
+var svg = d3.select("#visualization")
+	        .append("svg")
+	        .attr("width", svg_width)
+	        .attr("height", svg_height);
+// var g = svg.append("g")
+//            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.json('nyc_boroughs.json', function(data) {
+	// console.log(data);
+	var nyc_boroughs = topojson.feature(data, data.objects.nyc_boroughs);
+	var projection = d3.geoAlbers()
+					   .fitExtent([[20,20], [svg_width, svg_height]], nyc_boroughs);
+	var path = d3.geoPath()
+				 .projection(projection);
+	svg.append("g")
+	   .attr("class", "map")
+	   .append("path")
+	   .datum(nyc_boroughs)
+	   .attr("d", path);
+
+	d3.csv('../citibike-data/2016-09-trip-data.csv', parse, function(data) {
+		var trips = [];
+		data.forEach(function(d) {
+			trips.push({
+				type: "LineString",
+				coordinates: [
+					[d.start_station_longitude, d.start_station_latitude],
+					[d.end_station_longitude, d.end_station_latitude]
+				]
+			});
+		});
+		console.log(trips[0]);
+		svg.selectAll(".trip")
+		   .data(trips)
+		   .enter()
+		   .append("path")
+		   .attr("d", path)
+		   .attr("class", "trip");
+	});
+});
+// put data into buckets by 1/2 hr?
+
+function parse(d, _, columns) {
+	d.tripduration = +d.tripduration;
+	d.starttime = new Date(d.starttime);
+	d.stoptime = new Date(d.stoptime);
+	d.start_station_latitude = +d.start_station_latitude;
+	d.start_station_longitude = +d.start_station_longitude;
+	d.end_station_latitude = +d.end_station_latitude;
+	d.end_station_longitude = +d.end_station_longitude;
+	return d;
+}
+</script>
+</body>
+</html>
