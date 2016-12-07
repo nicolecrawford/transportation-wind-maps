@@ -55,16 +55,15 @@ d3.json('nyc_streets.json', function(data) {
 	d3.csv('citibike-data/2014-02-trip-data.csv', parse, function(data) {
 		// console.log(data[0]);
 		// console.log(data.length);
-		data = data.slice(0, data.length/1000); // get this working on 22 values before expanding
-		var trips = d3.nest()
-					  .key(function(d) { return d.starttime.toDateString(); })
-					  .entries(data);
-					  // make this nested with the (Multi)LineString stuff?
-		var vals = trips[0].values;
-		start = vals[0].starttime;
+		var trips = data.slice(0, data.length/1000); // get this working on ~220 values before expanding
+		// var trips = d3.nest()
+		// 			  .key(function(d) { return d.starttime.toDateString(); })
+		// 			  .entries(data);
+		// var vals = trips[0].values;
+		start = trips[0].starttime;
 		current_time = start;
-		end = vals[vals.length-1].stoptime;
-		interval = setInterval(function() { showTrips(vals); }, 1500);
+		end = trips[trips.length-1].stoptime;
+		interval = setInterval(function() { showTrips(trips); }, 1500);
 			// trips.push({
 			// 	type: "LineString",
 			// 	coordinates: [
@@ -88,7 +87,6 @@ d3.json('nyc_streets.json', function(data) {
 		// console.log("lines should be visible now");
 	});
 });
-// put data into buckets by 1/2 hr?
 
 function parse(d, _, columns) {
 	d.tripduration = +d.tripduration;
@@ -133,7 +131,7 @@ function showTrips(trips) {
 	data.exit()
 		.remove();
 
-	current_time = new Date(current_time.getTime() + 900000);
+	current_time = new Date(current_time.getTime() + 900000); // 15 min intervals
 }
 
 function lineAnimate(selection) {
