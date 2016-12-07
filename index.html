@@ -8,16 +8,18 @@
 	<style type="text/css">
 		.map {
 			fill: none;
-			stroke: black;
+			stroke: gray;
+			opacity: 0.5;
 		}
 
 		.trip {
 			fill: none;
-			stroke: red;
+			stroke: black;
 		}
 	</style>
 </head>
 <body>
+<div id="current_time"></div>
 <div id="visualization"></div>
 <script type="text/javascript">
 var svg_width = 1000;
@@ -31,38 +33,59 @@ var svg = d3.select("#visualization")
 	        .attr("height", svg_height);
 // var g = svg.append("g")
 //            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+var start = 0;
+var end = 0;
+var current_time = 0;
+var interval;
+var path;
 
-d3.json('nyc_boroughs.json', function(data) {
+d3.json('nyc_streets.json', function(data) {
 	// console.log(data);
-	var nyc_boroughs = topojson.feature(data, data.objects.nyc_boroughs);
+	var nyc_streets = topojson.feature(data, data.objects.nyc_streets);
 	var projection = d3.geoAlbers()
-					   .fitExtent([[20,20], [svg_width, svg_height]], nyc_boroughs);
-	var path = d3.geoPath()
-				 .projection(projection);
+					   .fitExtent([[20,20], [svg_width, svg_height]], nyc_streets);
+	path = d3.geoPath()
+			 .projection(projection);
 	svg.append("g")
 	   .attr("class", "map")
 	   .append("path")
-	   .datum(nyc_boroughs)
+	   .datum(nyc_streets)
 	   .attr("d", path);
 
-	d3.csv('../citibike-data/2016-09-trip-data.csv', parse, function(data) {
-		var trips = [];
-		data.forEach(function(d) {
-			trips.push({
-				type: "LineString",
-				coordinates: [
-					[d.start_station_longitude, d.start_station_latitude],
-					[d.end_station_longitude, d.end_station_latitude]
-				]
-			});
-		});
-		console.log(trips[0]);
-		svg.selectAll(".trip")
-		   .data(trips)
-		   .enter()
-		   .append("path")
-		   .attr("d", path)
-		   .attr("class", "trip");
+	d3.csv('citibike-data/2014-02-trip-data.csv', parse, function(data) {
+		// console.log(data[0]);
+		// console.log(data.length);
+		data = data.slice(0, data.length/1000); // get this working on 22 values before expanding
+		var trips = d3.nest()
+					  .key(function(d) { return d.starttime.toDateString(); })
+					  .entries(data);
+					  // make this nested with the (Multi)LineString stuff?
+		var vals = trips[0].values;
+		start = vals[0].starttime;
+		current_time = start;
+		end = vals[vals.length-1].stoptime;
+		interval = setInterval(function() { showTrips(vals); }, 1500);
+			// trips.push({
+			// 	type: "LineString",
+			// 	coordinates: [
+			// 		[d.start_station_longitude, d.start_station_latitude],
+			// 		[d.end_station_longitude, d.end_station_latitude]
+			// 	]
+			// });
+		// });
+		// console.log(trips);
+		// var trips = {
+		// 	type: "MultiLineString",
+		// 	coordinates: coords
+		// };
+		// console.log(trips);
+		// svg.selectAll(".trip")
+		//    .data(trips)
+		//    .enter()
+		//    .append("path")
+		//    .attr("d", path)
+		//    .attr("class", "trip");
+		// console.log("lines should be visible now");
 	});
 });
 // put data into buckets by 1/2 hr?
@@ -76,6 +99,58 @@ function parse(d, _, columns) {
 	d.end_station_latitude = +d.end_station_latitude;
 	d.end_station_longitude = +d.end_station_longitude;
 	return d;
+}
+
+function showTrips(trips) {
+	d3.select('#current_time')
+	  .html(current_time.toLocaleString());
+	if (current_time >= end) {
+		clearInterval(interval);
+		return;
+	}
+	var filtered_trips = [];
+	trips.forEach(function(trip) {
+		// console.log(trip);
+		if (trip.starttime >= current_time && trip.stoptime > current_time) {
+			// console.log(trip);
+			filtered_trips.push({
+				type: "LineString",
+				coordinates: [
+					[trip.start_station_longitude, trip.start_station_latitude],
+					[trip.end_station_longitude, trip.end_station_latitude]
+				]
+			});
+		}
+	});
+
+	var data = svg.selectAll(".trip")
+			      .data(filtered_trips);
+	data.enter()
+	    .append("path")
+	    .attr("d", path)
+	    .attr("class", "trip")
+	    .call(lineAnimate);
+	data.exit()
+		.remove();
+
+	current_time = new Date(current_time.getTime() + 900000);
+}
+
+function lineAnimate(selection) {
+	if (selection.node() == null) return;
+	var length = selection.node().getTotalLength();
+	selection.attr('opacity', 1)
+			 .attr('stroke-dasharray', length + ' ' + length)
+			 .attr('stroke-dashoffset', length)
+			 .transition()
+			 .ease(d3.easeLinear)
+			 .duration(1000)
+			 .attr('stroke-dashoffset', 0)
+			 .transition()
+			 .ease(d3.easeLinear)
+			 .duration(500)
+			 .attr('opacity', 0)
+			 .on('end', function() { d3.select(this).call(lineAnimate); });
 }
 </script>
 </body>
