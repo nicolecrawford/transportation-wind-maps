@@ -16,14 +16,18 @@
 			fill: none;
 			stroke: black;
 		}
+
+		#display_time {
+			font-family: HelveticaNeue-Light;
+		}
 	</style>
 </head>
 <body>
-<div id="current_time"></div>
+<div id="params"><div id="display_time">Time: </div></div>
 <div id="visualization"></div>
 <script type="text/javascript">
-var svg_width = 400;
 var svg_height = 500;
+var svg_width = 400;
 // var margin = {top: 20, right: 80, bottom: 30, left: 50};
 // var width = svg_width - (margin.left + margin.right);
 // var height = svg_height - (margin.top + margin.bottom);
@@ -38,6 +42,20 @@ var end = 0;
 var current_time = 0;
 var interval;
 var path;
+var running = false;
+var trips = [];
+
+// d3.select("#params")
+//   .append("input")
+//   .attr("id", "slider")
+//   .attr("type", "range")
+//   .attr("value", current_time);
+d3.select("#params")
+  .append("button")
+  .attr("id", "play")
+  .text("Play")
+  .attr("type", "button")
+  .on("click", handleClick);
 
 d3.json('nyc_streets.json', function(data) {
 	// console.log(data);
@@ -48,7 +66,6 @@ d3.json('nyc_streets.json', function(data) {
 					   // .scale(90896.97598634104);
 	path = d3.geoPath()
 			 .projection(projection);
-	console.log(projection.translate());
 	svg.append("g")
 	   .attr("class", "map")
 	   .append("path")
@@ -56,38 +73,19 @@ d3.json('nyc_streets.json', function(data) {
 	   .attr("d", path);
 
 	d3.csv('citibike-data/2014-02-trip-data.csv', parse, function(data) {
-		// console.log(data[0]);
-		// console.log(data.length);
-		var trips = data.slice(0, data.length/1000); // get this working on ~220 values before expanding
-		// var trips = d3.nest()
-		// 			  .key(function(d) { return d.starttime.toDateString(); })
-		// 			  .entries(data);
-		// var vals = trips[0].values;
+		trips = data.slice(0, data.length/1000); // get this working on ~220 values before expanding
+
 		start = trips[0].starttime;
 		current_time = start;
 		end = trips[trips.length-1].stoptime;
-		interval = setInterval(function() { showTrips(trips); }, 1500);
-			// trips.push({
-			// 	type: "LineString",
-			// 	coordinates: [
-			// 		[d.start_station_longitude, d.start_station_latitude],
-			// 		[d.end_station_longitude, d.end_station_latitude]
-			// 	]
-			// });
-		// });
-		// console.log(trips);
-		// var trips = {
-		// 	type: "MultiLineString",
-		// 	coordinates: coords
-		// };
-		// console.log(trips);
-		// svg.selectAll(".trip")
-		//    .data(trips)
-		//    .enter()
-		//    .append("path")
-		//    .attr("d", path)
-		//    .attr("class", "trip");
-		// console.log("lines should be visible now");
+		
+		// d3.select("#slider")
+		//   .attr("min", start.getTime())
+		//   .attr("max", end.getTime())
+		//   .attr("step", 900000) // 15 min steps
+		//   .attr("value", start.getTime())
+		//   .on("change", updateTime);
+
 	});
 });
 
@@ -103,9 +101,12 @@ function parse(d, _, columns) {
 }
 
 function showTrips(trips) {
-	d3.select('#current_time')
-	  .html(current_time.toLocaleString());
+	d3.select('#display_time')
+	  .html('Time: ' + current_time.toLocaleString());
 	if (current_time >= end) {
+		running = false;
+		d3.select("#play")
+		  .text("Play");
 		clearInterval(interval);
 		return;
 	}
@@ -134,6 +135,7 @@ function showTrips(trips) {
 	data.exit()
 		.remove();
 
+	// d3.select("#slider").attr("value", current_time.getTime());
 	current_time = new Date(current_time.getTime() + 900000); // 15 min intervals
 }
 
@@ -153,12 +155,32 @@ function lineAnimate(selection) {
 			 .attr('opacity', 0)
 			 .on('end', function() { d3.select(this).call(lineAnimate); });
 }
+
+function handleClick() {
+	var btn = d3.select(this);
+	if (running) {
+		running = false;
+		clearInterval(interval);
+		btn.text("Play");
+	} else {
+		running = true;
+		btn.text("Pause");
+		if (current_time >= end) current_time = start;
+		interval = setInterval(function() { showTrips(trips); }, 1500);
+	}
+}
+
+function updateTime() {
+	var slider = d3.select(this);
+	var new_time = parseInt(slider.attr("value"));
+	current_time = new Date(new_time);
+}
 /* TODO:
 - make vizualization pretty
-- add a slider to day/time?
+- add a slider?
 - add play/pause button
 - change line thickness based on # people
-- add stations 
+- add stations as nodes?
 */
 </script>
 </body>
